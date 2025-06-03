@@ -1,6 +1,18 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Building, Database, FolderOpen } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building,
+  Database,
+  FolderOpen,
+} from "lucide-react";
 import { GristOrganization, GristWorkspace } from "@/lib/grist";
 
 interface OrganizationSelectionStepProps {
@@ -48,11 +60,13 @@ export const OrganizationSelectionStep = ({
             <Building className="h-5 w-5" />
             Select Organization
           </h3>
-          
+
           {isLoadingOrgs ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-              <span className="ml-2 text-gray-600">Loading organizations...</span>
+              <span className="ml-2 text-gray-600">
+                Loading organizations...
+              </span>
             </div>
           ) : (
             <div className="grid gap-3">
@@ -60,22 +74,26 @@ export const OrganizationSelectionStep = ({
                 <div
                   key={org.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-all hover:border-green-300 ${
-                    selectedOrg === org.id 
-                      ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
-                      : 'border-gray-200 hover:bg-gray-50'
+                    selectedOrg === org.id
+                      ? "border-green-500 bg-green-50 ring-2 ring-green-200"
+                      : "border-gray-200 hover:bg-gray-50"
                   }`}
                   onClick={() => onOrgSelect(org.id)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      selectedOrg === org.id ? 'bg-green-600' : 'bg-gray-400'
-                    }`}>
+                    <div
+                      className={`p-2 rounded-lg ${
+                        selectedOrg === org.id ? "bg-green-600" : "bg-gray-400"
+                      }`}
+                    >
                       <Building className="h-4 w-4 text-white" />
                     </div>
                     <div>
                       <div className="font-medium">{org.name}</div>
                       {org.domain && (
-                        <div className="text-sm text-gray-600">{org.domain}</div>
+                        <div className="text-sm text-gray-600">
+                          {org.domain}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -92,11 +110,13 @@ export const OrganizationSelectionStep = ({
               <FolderOpen className="h-5 w-5" />
               Select Workspace
             </h3>
-            
+
             {isLoadingWorkspaces ? (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
-                <span className="ml-2 text-gray-600">Loading workspaces...</span>
+                <span className="ml-2 text-gray-600">
+                  Loading workspaces...
+                </span>
               </div>
             ) : (
               <div className="grid gap-3">
@@ -104,16 +124,20 @@ export const OrganizationSelectionStep = ({
                   <div
                     key={workspace.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all hover:border-green-300 ${
-                      selectedWorkspace === workspace.id 
-                        ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
-                        : 'border-gray-200 hover:bg-gray-50'
+                      selectedWorkspace === workspace.id
+                        ? "border-green-500 bg-green-50 ring-2 ring-green-200"
+                        : "border-gray-200 hover:bg-gray-50"
                     }`}
                     onClick={() => onWorkspaceSelect(workspace.id)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        selectedWorkspace === workspace.id ? 'bg-green-600' : 'bg-gray-400'
-                      }`}>
+                      <div
+                        className={`p-2 rounded-lg ${
+                          selectedWorkspace === workspace.id
+                            ? "bg-green-600"
+                            : "bg-gray-400"
+                        }`}
+                      >
                         <FolderOpen className="h-4 w-4 text-white" />
                       </div>
                       <div>
@@ -139,15 +163,11 @@ export const OrganizationSelectionStep = ({
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
-          <Button
-            variant="outline"
-            onClick={onGoBack}
-            className="flex-1"
-          >
+          <Button variant="outline" onClick={onGoBack} className="flex-1">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Tables
           </Button>
-          
+
           <Button
             onClick={onContinue}
             disabled={!selectedOrg || !selectedWorkspace}
@@ -160,4 +180,4 @@ export const OrganizationSelectionStep = ({
       </CardContent>
     </Card>
   );
-}; 
+};

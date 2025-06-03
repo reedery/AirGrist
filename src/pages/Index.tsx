@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  createAirtableService, 
-  type AirtableBase, 
-  type AirtableTable 
+import {
+  createAirtableService,
+  type AirtableBase,
+  type AirtableTable,
 } from "@/lib/airtable";
 import {
   createGristService,
@@ -34,7 +34,7 @@ const Index = () => {
   const [selectedBase, setSelectedBase] = useState("");
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [gristToken, setGristToken] = useState("");
-  const [gristUrl, setGristUrl] = useState("https://docs.getgrist.com");
+  const [gristUrl, setGristUrl] = useState(GRIST_API_URL);
   const [isValidatingToken, setIsValidatingToken] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [airtableBases, setAirtableBases] = useState<AirtableBase[]>([]);
@@ -45,7 +45,9 @@ const Index = () => {
   const [gristOrgs, setGristOrgs] = useState<GristOrganization[]>([]);
   const [gristWorkspaces, setGristWorkspaces] = useState<GristWorkspace[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<number | null>(null);
-  const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<number | null>(
+    null
+  );
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
   const { toast } = useToast();
@@ -55,7 +57,7 @@ const Index = () => {
       toast({
         title: "Airtable Token Required",
         description: "Please enter your Airtable API token",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -64,14 +66,14 @@ const Index = () => {
       toast({
         title: "Grist Details Required",
         description: "Please provide both Grist token and URL",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     setIsValidatingToken(true);
     setIsLoadingBases(true);
-    
+
     try {
       // Show validation progress
       toast({
@@ -80,16 +82,20 @@ const Index = () => {
       });
 
       // Validate Grist credentials first
-      const isGristValid = await validateGristCredentials(GRIST_API_URL, gristToken);
-      
+      const isGristValid = await validateGristCredentials(
+        GRIST_API_URL,
+        gristToken
+      );
+
       if (!isGristValid) {
         setIsValidatingToken(false);
         setIsLoadingBases(false);
-        
+
         toast({
           title: "Grist Connection Failed",
-          description: "Failed to connect to Grist. Please check your token and try again.",
-          variant: "destructive"
+          description:
+            "Failed to connect to Grist. Please check your token and try again.",
+          variant: "destructive",
         });
         return;
       }
@@ -103,20 +109,20 @@ const Index = () => {
       setIsValidatingToken(false);
       setIsLoadingBases(false);
       setCurrentStep(2);
-      
+
       toast({
         title: "Connection Successful",
         description: `Connected to both services! Found ${bases.length} accessible base(s).`,
       });
-
     } catch (error) {
       setIsValidatingToken(false);
       setIsLoadingBases(false);
-      
+
       toast({
         title: "Connection Failed",
-        description: "Failed to connect to one or both services. Please check your credentials and try again.",
-        variant: "destructive"
+        description:
+          "Failed to connect to one or both services. Please check your credentials and try again.",
+        variant: "destructive",
       });
     }
   };
@@ -124,33 +130,36 @@ const Index = () => {
   const handleBaseSelection = async (baseId: string) => {
     setSelectedBase(baseId);
     setIsLoadingTables(true);
-    
+
     try {
       const airtableService = createAirtableService(airtableToken);
       const tables = await airtableService.getTables(baseId);
       setAirtableTables(tables);
       setIsLoadingTables(false);
       setCurrentStep(3);
-      
+
       toast({
         title: "Base Selected",
-        description: `Loaded ${tables.length} table(s) from ${airtableBases.find(b => b.id === baseId)?.name}`,
+        description: `Loaded ${tables.length} table(s) from ${
+          airtableBases.find((b) => b.id === baseId)?.name
+        }`,
       });
     } catch (error) {
       setIsLoadingTables(false);
-      
+
       toast({
         title: "Failed to Load Tables",
-        description: "Failed to fetch tables from the selected base. Please try again.",
-        variant: "destructive"
+        description:
+          "Failed to fetch tables from the selected base. Please try again.",
+        variant: "destructive",
       });
     }
   };
 
   const handleTableToggle = (tableId: string) => {
-    setSelectedTables(prev => 
-      prev.includes(tableId) 
-        ? prev.filter(id => id !== tableId)
+    setSelectedTables((prev) =>
+      prev.includes(tableId)
+        ? prev.filter((id) => id !== tableId)
         : [...prev, tableId]
     );
   };
@@ -160,7 +169,7 @@ const Index = () => {
       toast({
         title: "No Tables Selected",
         description: "Please select at least one table to import",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -171,6 +180,7 @@ const Index = () => {
     try {
       const gristService = createGristService(GRIST_API_URL, gristToken);
       const orgs = await gristService.getOrgs();
+      console.log("setGristOrgs", orgs);
       setGristOrgs(orgs);
       setIsLoadingOrgs(false);
 
@@ -182,8 +192,9 @@ const Index = () => {
       setIsLoadingOrgs(false);
       toast({
         title: "Failed to Load Organizations",
-        description: "Failed to fetch organizations from Grist. Please try again.",
-        variant: "destructive"
+        description:
+          "Failed to fetch organizations from Grist. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -199,7 +210,7 @@ const Index = () => {
       setGristWorkspaces(workspaces);
       setIsLoadingWorkspaces(false);
 
-      const orgName = gristOrgs.find(org => org.id === orgId)?.name;
+      const orgName = gristOrgs.find((org) => org.id === orgId)?.name;
       toast({
         title: "Workspaces Loaded",
         description: `Found ${workspaces.length} workspace(s) in ${orgName}`,
@@ -208,8 +219,9 @@ const Index = () => {
       setIsLoadingWorkspaces(false);
       toast({
         title: "Failed to Load Workspaces",
-        description: "Failed to fetch workspaces from the selected organization. Please try again.",
-        variant: "destructive"
+        description:
+          "Failed to fetch workspaces from the selected organization. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -223,7 +235,7 @@ const Index = () => {
       toast({
         title: "No Tables Selected",
         description: "Please select at least one table to import",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -232,105 +244,124 @@ const Index = () => {
       toast({
         title: "No Workspace Selected",
         description: "Please select a workspace for the migration",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-    
+
     setIsImporting(true);
-    
+
     try {
       // Initialize services
       const airtableService = createAirtableService(airtableToken);
       const gristService = createGristService(GRIST_API_URL, gristToken);
-      
+
       // Create a new Grist document
-      const baseName = airtableBases.find(b => b.id === selectedBase)?.name || 'Unknown Base';
+      const baseName =
+        airtableBases.find((b) => b.id === selectedBase)?.name ||
+        "Unknown Base";
       const documentName = `Imported from ${baseName} - ${new Date().toLocaleDateString()}`;
-      
+
       toast({
         title: "Creating Grist Document",
         description: "Setting up your new Grist document...",
       });
-      
-      const documentId = await gristService.createDocument(selectedWorkspace, documentName);
+
+      const documentId = await gristService.createDocument(
+        selectedWorkspace,
+        documentName
+      );
       setCreatedDocumentId(documentId);
-      
+
       // Process each selected table
       const gristTables = [];
       const tableSchemas: Record<string, any> = {};
-      
+
       toast({
         title: "Fetching Table Schemas",
         description: "Getting table structures from Airtable...",
       });
-      
+
       // Fetch schemas for all selected tables
       for (const tableId of selectedTables) {
-        const tableSchema = await airtableService.getTableSchema(selectedBase, tableId);
+        const tableSchema = await airtableService.getTableSchema(
+          selectedBase,
+          tableId
+        );
         tableSchemas[tableId] = tableSchema;
-        
+
         // Convert Airtable table to Grist format
         const gristTable = airtableToGristTable(tableSchema);
         gristTables.push(gristTable);
       }
-      
+
       // Create tables in Grist
       toast({
         title: "Creating Tables in Grist",
         description: "Setting up table structures...",
       });
-      
-      const createdTableIds = await gristService.addTablesToDocument(documentId, gristTables);
-      
+
+      const createdTableIds = await gristService.addTablesToDocument(
+        documentId,
+        gristTables
+      );
+
       // Migrate data for each table
       toast({
         title: "Migrating Data",
         description: "Transferring records from Airtable to Grist...",
       });
-      
+
       for (let i = 0; i < selectedTables.length; i++) {
         const airtableTableId = selectedTables[i];
         const gristTableId = createdTableIds[i];
         const tableName = tableSchemas[airtableTableId].name;
-        
+
         toast({
           title: `Migrating Table: ${tableName}`,
           description: `Processing table ${i + 1} of ${selectedTables.length}`,
         });
-        
+
         // Fetch all records from Airtable
-        const records = await airtableService.getAllRecords(selectedBase, airtableTableId);
-        
+        const records = await airtableService.getAllRecords(
+          selectedBase,
+          airtableTableId
+        );
+
         if (records.length > 0) {
           // Transform records to Grist format
-          const gristRecords = records.map(record => record.fields || record);
-          
+          const gristRecords = records.map((record) => record.fields || record);
+
           // Add records to Grist in batches
           const batchSize = 100;
           for (let j = 0; j < gristRecords.length; j += batchSize) {
             const batch = gristRecords.slice(j, j + batchSize);
-            await gristService.addRecordsToTable(documentId, gristTableId, batch);
+            await gristService.addRecordsToTable(
+              documentId,
+              gristTableId,
+              batch
+            );
           }
         }
       }
-      
+
       setIsImporting(false);
       setCurrentStep(5);
-      
+
       toast({
         title: "Migration Complete! 🎉",
         description: `Successfully imported ${selectedTables.length} tables to Grist`,
       });
-      
     } catch (error: any) {
       setIsImporting(false);
-      console.error('Migration failed:', error);
-      
+      console.error("Migration failed:", error);
+
       toast({
         title: "Migration Failed",
-        description: error.message || "An error occurred during migration. Please try again.",
-        variant: "destructive"
+        description:
+          error.message ||
+          "An error occurred during migration. Please try again.",
+        variant: "destructive",
       });
     }
   };
@@ -338,10 +369,10 @@ const Index = () => {
   const handleOpenGrist = () => {
     if (createdDocumentId) {
       // Open the specific document that was created
-      window.open(`${GRIST_API_URL}/doc/${createdDocumentId}`, '_blank');
+      window.open(`${GRIST_API_URL}/doc/${createdDocumentId}`, "_blank");
     } else {
       // Fallback to the original URL
-      window.open(gristUrl, '_blank');
+      window.open(gristUrl, "_blank");
     }
   };
 
@@ -351,7 +382,7 @@ const Index = () => {
     setSelectedBase("");
     setSelectedTables([]);
     setGristToken("");
-    setGristUrl("https://docs.getgrist.com");
+    setGristUrl(GRIST_API_URL);
     setAirtableBases([]);
     setAirtableTables([]);
     setIsLoadingBases(false);
@@ -369,11 +400,8 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
       <div className="container mx-auto px-4 py-8">
         <MigrationHeader />
-        
-        <MigrationProgress 
-          currentStep={currentStep} 
-          totalSteps={5} 
-        />
+
+        <MigrationProgress currentStep={currentStep} totalSteps={5} />
 
         <div className="max-w-4xl mx-auto">
           {currentStep === 1 && (
