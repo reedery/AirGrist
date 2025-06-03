@@ -250,8 +250,13 @@ export function airtableToGristRecord(
     if (typeof value == "string") result = value;
     else if (typeof value == "number") result = value;
     else if (typeof value == "boolean") result = value;
-    else if (Array.isArray(value)) result = ["L", ...value];
-    else result = null;
+    else if (Array.isArray(value)) {
+      if (value.length === 1) {
+        result = value[0];
+      } else {
+        result = ["L", ...value];
+      }
+    } else result = null;
 
     // console.log(value, result);
     gristFields[gristTableMapping[field]] = result;
@@ -300,6 +305,12 @@ export function airtableToGristFieldType(
 
   const gristType = typeMapping[airtableField.type] || GristFieldType.TEXT;
 
+  if (gristType == GristFieldType.CHOICE) {
+    return [
+      gristType,
+      { choices: airtableField.options.choices.map((choice) => choice.name) },
+    ];
+  }
   if (gristType == GristFieldType.CHOICE_LIST) {
     return [
       gristType,
