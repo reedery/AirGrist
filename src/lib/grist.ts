@@ -210,7 +210,7 @@ export class GristService {
       });
 
       const data = await this.handleResponse(response);
-      return data || [];
+      return (data || []).filter((org) => org.domain != "docs-26");
     } catch (error) {
       console.error("Error fetching Grist organizations:", error);
       throw error;
