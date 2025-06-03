@@ -76,12 +76,10 @@ export class GristService {
     return {
       Authorization: `Bearer ${this.token}`,
       "Content-Type": "application/json",
-      //"X-Requested-With": "idunno",
     };
   }
 
   private async handleResponse(response: Response): Promise<any> {
-    console.log("handleResponse", response);
     if (!response.ok) {
       const errorMessage = `Grist API error: ${response.status} ${response.statusText}`;
       throw new GristApiError(
@@ -200,25 +198,6 @@ export class GristService {
   }
 
   /**
-   * Get organizations to verify API access
-   */
-  // async getOrganizations(): Promise<any[]> {
-  //   try {
-  //     const url = `${this.baseUrl}/api/orgs`;
-  //     const response = await fetch(url, {
-  //       method: "GET",
-  //       headers: this.getHeaders(),
-  //     });
-
-  //     const data = await this.handleResponse(response);
-  //     return data.orgs || [];
-  //   } catch (error) {
-  //     console.error("Error fetching Grist organizations:", error);
-  //     throw error;
-  //   }
-  // }
-
-  /**
    * Get organizations for selection
    */
   async getOrgs(): Promise<GristOrganization[]> {
@@ -258,6 +237,28 @@ export class GristService {
   }
 }
 
+export function airtableToGristRecord(
+  airtableRecord: any,
+  gristTableMapping: Record<string, string>
+): any {
+  const gristFields = {};
+
+  for (const field in airtableRecord.fields) {
+    const value = airtableRecord.fields[field];
+
+    let result;
+    if (typeof value == "string") result = value;
+    else if (typeof value == "number") result = value;
+    else if (Array.isArray(value)) result = ["L", ...value];
+    else result = null;
+
+    // console.log(value, result);
+    gristFields[gristTableMapping[field]] = result;
+  }
+
+  return gristFields;
+}
+
 /**
  * Convert Airtable field type to Grist field type
  */
@@ -276,7 +277,7 @@ export function airtableToGristFieldType(airtableType: string): GristFieldType {
     dateTime: GristFieldType.DATETIME,
     checkbox: GristFieldType.BOOL,
     singleSelect: GristFieldType.CHOICE,
-    multipleSelects: GristFieldType.TEXT, // Grist doesn't have multi-choice, use text
+    multipleSelects: GristFieldType.CHOICE_LIST,
     formula: GristFieldType.TEXT, // Will need special handling
     attachment: GristFieldType.TEXT, // Store as URLs/text
     autoNumber: GristFieldType.INT,
@@ -300,19 +301,28 @@ export function airtableToGristFieldType(airtableType: string): GristFieldType {
 /**
  * Convert Airtable table schema to Grist table schema
  */
-export function airtableToGristTable(airtableTable: any): GristTable {
-  const columns: GristColumn[] = airtableTable.fields.map((field: any) => ({
-    id: field.id,
-    fields: {
-      label: field.name,
-      type: airtableToGristFieldType(field.type),
-    },
-  }));
+export function airtableToGristTable(
+  airtableTable: any
+): [GristTable, Record<string, string>] {
+  const mapping = {};
+  const columns: GristColumn[] = airtableTable.fields.map((field: any) => {
+    mapping[field.name] = field.id;
+    return {
+      id: field.id,
+      fields: {
+        label: field.name,
+        type: airtableToGristFieldType(field.type),
+      },
+    };
+  });
 
-  return {
-    id: airtableTable.name,
-    columns,
-  };
+  return [
+    {
+      id: airtableTable.name,
+      columns,
+    },
+    mapping,
+  ];
 }
 
 /**

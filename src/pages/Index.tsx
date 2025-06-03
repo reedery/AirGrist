@@ -12,6 +12,7 @@ import {
   GristService,
   type GristOrganization,
   type GristWorkspace,
+  airtableToGristRecord,
 } from "@/lib/grist";
 import {
   MigrationHeader,
@@ -180,7 +181,6 @@ const Index = () => {
     try {
       const gristService = createGristService(GRIST_API_URL, gristToken);
       const orgs = await gristService.getOrgs();
-      console.log("setGristOrgs", orgs);
       setGristOrgs(orgs);
       setIsLoadingOrgs(false);
 
@@ -275,6 +275,7 @@ const Index = () => {
 
       // Process each selected table
       const gristTables = [];
+      const gristTableMappings = [];
       const tableSchemas: Record<string, any> = {};
 
       toast({
@@ -291,8 +292,10 @@ const Index = () => {
         tableSchemas[tableId] = tableSchema;
 
         // Convert Airtable table to Grist format
-        const gristTable = airtableToGristTable(tableSchema);
+        const [gristTable, gristTableMapping] =
+          airtableToGristTable(tableSchema);
         gristTables.push(gristTable);
+        gristTableMappings.push(gristTableMapping);
       }
 
       // Create tables in Grist
@@ -316,6 +319,7 @@ const Index = () => {
         const airtableTableId = selectedTables[i];
         const gristTableId = createdTableIds[i];
         const tableName = tableSchemas[airtableTableId].name;
+        const gristTableMapping = gristTableMappings[i];
 
         toast({
           title: `Migrating Table: ${tableName}`,
@@ -323,25 +327,29 @@ const Index = () => {
         });
 
         // Fetch all records from Airtable
-        const records = await airtableService.getAllRecords(
+        const airtableRecords = await airtableService.getAllRecords(
           selectedBase,
           airtableTableId
         );
 
-        if (records.length > 0) {
-          // Transform records to Grist format
-          const gristRecords = records.map((record) => record.fields || record);
+        if (airtableRecords.length == 0) continue;
 
-          // Add records to Grist in batches
-          const batchSize = 100;
-          for (let j = 0; j < gristRecords.length; j += batchSize) {
-            const batch = gristRecords.slice(j, j + batchSize);
-            await gristService.addRecordsToTable(
-              documentId,
-              gristTableId,
-              batch
-            );
-          }
+        const gristRecords = [];
+
+        // Transform records to Grist format
+        for (const airtableRecord of airtableRecords) {
+          const gristRecord = airtableToGristRecord(
+            airtableRecord,
+            gristTableMapping
+          );
+          gristRecords.push(gristRecord);
+        }
+
+        // Add records to Grist in batches
+        const batchSize = 100;
+        for (let j = 0; j < gristRecords.length; j += batchSize) {
+          const batch = gristRecords.slice(j, j + batchSize);
+          await gristService.addRecordsToTable(documentId, gristTableId, batch);
         }
       }
 
