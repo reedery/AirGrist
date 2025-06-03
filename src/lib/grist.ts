@@ -249,6 +249,7 @@ export function airtableToGristRecord(
     let result;
     if (typeof value == "string") result = value;
     else if (typeof value == "number") result = value;
+    else if (typeof value == "boolean") result = value;
     else if (Array.isArray(value)) result = ["L", ...value];
     else result = null;
 
