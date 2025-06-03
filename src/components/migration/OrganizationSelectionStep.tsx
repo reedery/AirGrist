@@ -71,7 +71,7 @@ export const OrganizationSelectionStep = ({
           ) : (
             <div className="grid gap-3">
               {gristOrgs.map((org) => (
-                <div
+                <button
                   key={org.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-all hover:border-green-300 ${
                     selectedOrg === org.id
@@ -97,7 +97,7 @@ export const OrganizationSelectionStep = ({
                       )}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -121,7 +121,7 @@ export const OrganizationSelectionStep = ({
             ) : (
               <div className="grid gap-3">
                 {gristWorkspaces.map((workspace) => (
-                  <div
+                  <button
                     key={workspace.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all hover:border-green-300 ${
                       selectedWorkspace === workspace.id
@@ -149,7 +149,7 @@ export const OrganizationSelectionStep = ({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {gristWorkspaces.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
