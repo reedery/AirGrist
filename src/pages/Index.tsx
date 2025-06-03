@@ -298,6 +298,8 @@ const Index = () => {
         gristTableMappings.push(gristTableMapping);
       }
 
+      // TODO: delete dummy table
+
       // Create tables in Grist
       toast({
         title: "Creating Tables in Grist",
