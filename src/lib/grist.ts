@@ -12,6 +12,7 @@ export enum GristFieldType {
   DATETIME = "DateTime",
   BOOL = "Bool",
   CHOICE = "Choice",
+  CHOICE_LIST = "ChoiceList",
   // Add more types as needed
 }
 
@@ -209,7 +210,6 @@ export class GristService {
       });
 
       const data = await this.handleResponse(response);
-      console.log("data", data);
       return data || [];
     } catch (error) {
       console.error("Error fetching Grist organizations:", error);
@@ -262,7 +262,9 @@ export function airtableToGristRecord(
 /**
  * Convert Airtable field type to Grist field type
  */
-export function airtableToGristFieldType(airtableType: string): GristFieldType {
+export function airtableToGristFieldType(
+  airtableField: any
+): [GristFieldType, any] {
   const typeMapping: Record<string, GristFieldType> = {
     singleLineText: GristFieldType.TEXT,
     multilineText: GristFieldType.TEXT,
@@ -295,7 +297,16 @@ export function airtableToGristFieldType(airtableType: string): GristFieldType {
     rollup: GristFieldType.TEXT,
   };
 
-  return typeMapping[airtableType] || GristFieldType.TEXT;
+  const gristType = typeMapping[airtableField.type] || GristFieldType.TEXT;
+
+  if (gristType == GristFieldType.CHOICE_LIST) {
+    return [
+      gristType,
+      { choices: airtableField.options.choices.map((choice) => choice.name) },
+    ];
+  }
+
+  return [gristType, null];
 }
 
 /**
@@ -305,16 +316,24 @@ export function airtableToGristTable(
   airtableTable: any
 ): [GristTable, Record<string, string>] {
   const mapping = {};
-  const columns: GristColumn[] = airtableTable.fields.map((field: any) => {
-    mapping[field.name] = field.id;
-    return {
-      id: field.id,
-      fields: {
-        label: field.name,
-        type: airtableToGristFieldType(field.type),
-      },
-    };
-  });
+  const columns: GristColumn[] = airtableTable.fields.map(
+    (airtableField: any) => {
+      mapping[airtableField.name] = airtableField.id;
+
+      const [gristType, widgetOptions] =
+        airtableToGristFieldType(airtableField);
+
+      return {
+        id: airtableField.id,
+        fields: {
+          label: airtableField.name,
+          type: gristType,
+          widgetOptions:
+            widgetOptions == null ? undefined : JSON.stringify(widgetOptions),
+        },
+      };
+    }
+  );
 
   return [
     {
