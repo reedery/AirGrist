@@ -169,21 +169,6 @@ The celebration confetti uses the Grist brand colors and includes:
 - Check for field type compatibility issues
 - Review browser console for detailed error messages
 
-### Development Issues
-
-**Port Already in Use**
-```bash
-# Kill process on port 5173
-lsof -ti:5173 | xargs kill -9
-```
-
-**Dependencies Issues**
-```bash
-# Clear cache and reinstall
-rm -rf node_modules package-lock.json
-npm install
-```
-
 ## 🧪 Development Tools
 
 ### React DevTools
@@ -205,9 +190,6 @@ The project includes comprehensive TypeScript definitions for:
 
 ## 🔮 Future Enhancements
 
-- [ ] **Backend API**: Full Python/Flask backend for production use
-- [ ] **Background Processing**: Celery integration for large migrations
-- [ ] **Progress Tracking**: Real-time migration progress with WebSockets
 - [ ] **Error Recovery**: Automatic retry mechanisms for failed migrations
 - [ ] **Data Validation**: Pre-migration data quality checks
 - [ ] **Batch Processing**: Optimize large dataset transfers
