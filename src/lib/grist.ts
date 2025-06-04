@@ -12,7 +12,7 @@ export enum GristFieldType {
   DATETIME = "DateTime",
   BOOL = "Bool",
   CHOICE = "Choice",
-  CHOICE_LIST = "ChoiceList",
+  CHOICE_LIST = "ChoiceList"
   // Add more types as needed
 }
 
@@ -76,7 +76,7 @@ export class GristService {
   private getHeaders(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.token}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     };
   }
 
@@ -105,7 +105,7 @@ export class GristService {
         method: "POST",
         headers: this.getHeaders(),
         body: JSON.stringify({ name: documentName }),
-        credentials: "include",
+        credentials: "include"
       });
 
       const data = await this.handleResponse(response);
@@ -128,7 +128,7 @@ export class GristService {
       const response = await fetch(url, {
         method: "POST",
         headers: this.getHeaders(),
-        body: JSON.stringify({ tables }),
+        body: JSON.stringify({ tables })
       });
 
       const data = await this.handleResponse(response);
@@ -149,14 +149,14 @@ export class GristService {
   ): Promise<void> {
     try {
       const gristFormattedRecords = records.map((record) => ({
-        fields: record,
+        fields: record
       }));
 
       const url = `${this.baseUrl}/api/docs/${documentId}/tables/${tableId}/records`;
       const response = await fetch(url, {
         method: "POST",
         headers: this.getHeaders(),
-        body: JSON.stringify({ records: gristFormattedRecords }),
+        body: JSON.stringify({ records: gristFormattedRecords })
       });
 
       await this.handleResponse(response);
@@ -187,7 +187,7 @@ export class GristService {
       const url = `${this.baseUrl}/api/orgs`;
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
 
       await this.handleResponse(response);
@@ -206,7 +206,7 @@ export class GristService {
       const url = `${this.baseUrl}/api/orgs`;
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
 
       const data = await this.handleResponse(response);
@@ -225,7 +225,7 @@ export class GristService {
       const url = `${this.baseUrl}/api/orgs/${orgId}/workspaces`;
       const response = await fetch(url, {
         method: "GET",
-        headers: this.getHeaders(),
+        headers: this.getHeaders()
       });
 
       const data = await this.handleResponse(response);
@@ -253,8 +253,9 @@ export function airtableToGristRecord(
     else if (Array.isArray(value)) result = ["L", ...value];
     else result = null;
 
-    // console.log(value, result);
-    gristFields[gristTableMapping[field]] = result;
+    if (gristTableMapping[field]) {
+      gristFields[gristTableMapping[field]] = result;
+    }
   }
 
   return gristFields;
@@ -295,7 +296,7 @@ export function airtableToGristFieldType(
     lastModifiedTime: GristFieldType.DATETIME,
     lookup: GristFieldType.TEXT,
     rating: GristFieldType.INT,
-    rollup: GristFieldType.TEXT,
+    rollup: GristFieldType.TEXT
   };
 
   const gristType = typeMapping[airtableField.type] || GristFieldType.TEXT;
@@ -303,7 +304,7 @@ export function airtableToGristFieldType(
   if (gristType == GristFieldType.CHOICE_LIST) {
     return [
       gristType,
-      { choices: airtableField.options.choices.map((choice) => choice.name) },
+      { choices: airtableField.options.choices.map((choice) => choice.name) }
     ];
   }
 
@@ -330,8 +331,8 @@ export function airtableToGristTable(
           label: airtableField.name,
           type: gristType,
           widgetOptions:
-            widgetOptions == null ? undefined : JSON.stringify(widgetOptions),
-        },
+            widgetOptions == null ? undefined : JSON.stringify(widgetOptions)
+        }
       };
     }
   );
@@ -339,9 +340,9 @@ export function airtableToGristTable(
   return [
     {
       id: airtableTable.name,
-      columns,
+      columns
     },
-    mapping,
+    mapping
   ];
 }
 
