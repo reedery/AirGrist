@@ -2,6 +2,9 @@
 
 A modern web application that provides a seamless migration path from Airtable to Grist, featuring an intuitive step-by-step wizard interface with celebratory confetti animations! 🎉
 
+Demo: https://imgur.com/a/airgrist-demo-1-min-fDW10Po
+
+
 ![Migration Wizard](https://img.shields.io/badge/Status-Active%20Development-brightgreen)
 ![React](https://img.shields.io/badge/React-18-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
