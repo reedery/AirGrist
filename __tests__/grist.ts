@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { airtableToGristRecord } from "../src/lib/grist.ts";
+import { airtableToGristRecord } from "../src/lib/migration.ts";
 
 describe("airtableToGristRecord", () => {
   it("should map Airtable fields to Grist fields using mapping", () => {

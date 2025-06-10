@@ -12,7 +12,6 @@ import {
   GristService,
   type GristOrganization,
   type GristWorkspace,
-  airtableToGristRecord,
 } from "@/lib/grist";
 import {
   MigrationHeader,
@@ -24,6 +23,7 @@ import {
   CompletionStep,
   MigrationFooter,
 } from "@/components/migration";
+import { migrateTables } from "@/lib/migration";
 
 // Configuration - in a real app, these would come from environment variables
 const GRIST_API_URL = "https://docs.getgrist.com";
@@ -256,121 +256,69 @@ const Index = () => {
       const airtableService = createAirtableService(airtableToken);
       const gristService = createGristService(GRIST_API_URL, gristToken);
 
-      // Create a new Grist document
-      const baseName =
-        airtableBases.find((b) => b.id === selectedBase)?.name ||
-        "Unknown Base";
+      // Create document name
+      const baseName = airtableBases.find((b) => b.id === selectedBase)?.name || "Unknown Base";
       const documentName = `Imported from ${baseName} - ${new Date().toLocaleDateString()}`;
 
-      toast({
-        title: "Creating Grist Document",
-        description: "Setting up your new Grist document...",
-      });
-
-      const documentId = await gristService.createDocument(
-        selectedWorkspace,
-        documentName
-      );
-      setCreatedDocumentId(documentId);
-
-      // Process each selected table
-      const gristTables = [];
-      const gristTableMappings = [];
-      const tableSchemas: Record<string, any> = {};
-
-      toast({
-        title: "Fetching Table Schemas",
-        description: "Getting table structures from Airtable...",
-      });
-
-      // Fetch schemas for all selected tables
-      for (const tableId of selectedTables) {
-        const tableSchema = await airtableService.getTableSchema(
-          selectedBase,
-          tableId
-        );
-        tableSchemas[tableId] = tableSchema;
-
-        // Convert Airtable table to Grist format
-        const [gristTable, gristTableMapping] =
-          airtableToGristTable(tableSchema);
-        gristTables.push(gristTable);
-        gristTableMappings.push(gristTableMapping);
-      }
-
-      // TODO: delete dummy table
-
-      // Create tables in Grist
-      toast({
-        title: "Creating Tables in Grist",
-        description: "Setting up table structures...",
-      });
-
-      const createdTableIds = await gristService.addTablesToDocument(
-        documentId,
-        gristTables
-      );
-
-      // Migrate data for each table
-      toast({
-        title: "Migrating Data",
-        description: "Transferring records from Airtable to Grist...",
-      });
-
-      for (let i = 0; i < selectedTables.length; i++) {
-        const airtableTableId = selectedTables[i];
-        const gristTableId = createdTableIds[i];
-        const tableName = tableSchemas[airtableTableId].name;
-        const gristTableMapping = gristTableMappings[i];
-
-        toast({
-          title: `Migrating Table: ${tableName}`,
-          description: `Processing table ${i + 1} of ${selectedTables.length}`,
-        });
-
-        // Fetch all records from Airtable
-        const airtableRecords = await airtableService.getAllRecords(
-          selectedBase,
-          airtableTableId
-        );
-
-        if (airtableRecords.length == 0) continue;
-
-        const gristRecords = [];
-
-        // Transform records to Grist format
-        for (const airtableRecord of airtableRecords) {
-          const gristRecord = airtableToGristRecord(
-            airtableRecord,
-            gristTableMapping
-          );
-          gristRecords.push(gristRecord);
+      const result = await migrateTables({
+        airtableService,
+        gristService,
+        source: {
+          baseId: selectedBase,
+          tableIds: selectedTables
+        },
+        destination: {
+          workspaceId: selectedWorkspace,
+          documentName
+        },
+        onProgress: (progress) => {
+          switch (progress.status) {
+            case 'creating':
+              toast({
+                title: "Creating Grist Document",
+                description: "Setting up your new Grist document...",
+              });
+              break;
+            case 'fetching':
+              toast({
+                title: "Fetching Table Schemas",
+                description: "Getting table structures from Airtable...",
+              });
+              break;
+            case 'migrating':
+              toast({
+                title: `Migrating Table: ${progress.tableName}`,
+                description: `Processing table ${progress.currentTable} of ${progress.totalTables}`,
+              });
+              break;
+            case 'error':
+              toast({
+                title: "Migration Error",
+                description: progress.error?.message || "An error occurred during migration",
+                variant: "destructive",
+              });
+              break;
+            case 'complete':
+              toast({
+                title: "Migration Complete! 🎉",
+                description: `Successfully imported ${selectedTables.length} tables to Grist`,
+              });
+              break;
+          }
         }
+      });
 
-        // Add records to Grist in batches
-        const batchSize = 100;
-        for (let j = 0; j < gristRecords.length; j += batchSize) {
-          const batch = gristRecords.slice(j, j + batchSize);
-          await gristService.addRecordsToTable(documentId, gristTableId, batch);
-        }
-      }
-
+      setCreatedDocumentId(result.documentId);
       setIsImporting(false);
       setCurrentStep(5);
 
-      toast({
-        title: "Migration Complete! 🎉",
-        description: `Successfully imported ${selectedTables.length} tables to Grist`,
-      });
-    } catch (error: any) {
+    } catch (error) {
       setIsImporting(false);
       console.error("Migration failed:", error);
 
       toast({
         title: "Migration Failed",
-        description:
-          error.message ||
-          "An error occurred during migration. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred during migration. Please try again.",
         variant: "destructive",
       });
     }

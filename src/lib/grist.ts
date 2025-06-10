@@ -237,35 +237,6 @@ export class GristService {
   }
 }
 
-export function airtableToGristRecord(
-  airtableRecord: any,
-  gristTableMapping: Record<string, string>
-): any {
-  const gristFields = {};
-
-  for (const field in airtableRecord.fields) {
-    const value = airtableRecord.fields[field];
-
-    let result;
-    if (typeof value == "string") result = value;
-    else if (typeof value == "number") result = value;
-    else if (typeof value == "boolean") result = value;
-    else if (Array.isArray(value)) {
-      if (value.length === 1) {
-        result = value[0];
-      } else {
-        result = ["L", ...value];
-      }
-    } else result = null;
-
-    if (gristTableMapping[field]) {
-      gristFields[gristTableMapping[field]] = result;
-    }
-  }
-
-  return gristFields;
-}
-
 /**
  * Convert Airtable field type to Grist field type
  */
@@ -309,7 +280,7 @@ export function airtableToGristFieldType(
   if (gristType == GristFieldType.CHOICE) {
     return [
       gristType,
-      { choices: airtableField.options.choices.map((choice) => choice.name) },
+      { choices: airtableField.options.choices.map((choice) => choice.name) }
     ];
   }
   if (gristType == GristFieldType.CHOICE_LIST) {
