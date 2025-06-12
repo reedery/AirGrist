@@ -1,21 +1,7 @@
 import { AirtableService } from "./airtable";
 import { GristService } from "./grist";
 import { AirtableTable } from "./airtable";
-import { airtableToGristTable, airtableToGristRecord } from "./migrationTable";
-
-interface MigrationConfig {
-  airtableService: AirtableService;
-  gristService: GristService;
-  source: {
-    baseId: string;
-    tableId: string;
-  };
-  destination: {
-    documentId: string;
-    tableId: string;
-  };
-  mapping: Record<string, string>;
-}
+import { airtableToGristTable, migrateTable } from "./migrationTable";
 
 interface MigrationTablesConfig {
   airtableService: AirtableService;
@@ -41,34 +27,6 @@ interface MigrationResult {
   documentId: string;
   tableIds: string[];
   errors: Error[];
-}
-
-export async function migrateTable(config: MigrationConfig): Promise<void> {
-  const { airtableService, gristService, source, destination, mapping } =
-    config;
-
-  // Fetch all records from Airtable
-  const airtableRecords = await airtableService.getAllRecords(
-    source.baseId,
-    source.tableId
-  );
-
-  if (airtableRecords.length === 0) return;
-
-  const gristRecords = airtableRecords.map((record) =>
-    airtableToGristRecord(record, mapping)
-  );
-
-  // Add records to Grist in batches
-  const batchSize = 100;
-  for (let i = 0; i < gristRecords.length; i += batchSize) {
-    const batch = gristRecords.slice(i, i + batchSize);
-    await gristService.addRecordsToTable(
-      destination.documentId,
-      destination.tableId,
-      batch
-    );
-  }
 }
 
 export async function migrateTables(

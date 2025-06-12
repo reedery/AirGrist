@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { migrateTable, migrateTables } from "../src/lib/migrationProcess";
+import { migrateTables } from "../src/lib/migrationProcess";
+import { migrateTable } from "../src/lib/migrationTable";
 import { AirtableService } from "../src/lib/airtable";
 import { GristService } from "../src/lib/grist";
 
