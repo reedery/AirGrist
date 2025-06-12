@@ -1,8 +1,7 @@
-import { AirtableService } from './airtable';
-import { GristService, airtableToGristTable } from './grist';
-import { AirtableTable } from './airtable';
-
-type AirtableFieldValue = string | number | boolean | string[] | number[] | boolean[];
+import { AirtableService } from "./airtable";
+import { GristService } from "./grist";
+import { AirtableTable } from "./airtable";
+import { airtableToGristTable, airtableToGristRecord } from "./migrationTable";
 
 interface MigrationConfig {
   airtableService: AirtableService;
@@ -16,14 +15,6 @@ interface MigrationConfig {
     tableId: string;
   };
   mapping: Record<string, string>;
-}
-
-interface AirtableRecord {
-  fields: Record<string, AirtableFieldValue>;
-}
-
-interface GristRecord {
-  [key: string]: string | number | boolean | (string | number | boolean)[] | null;
 }
 
 interface MigrationTablesConfig {
@@ -41,7 +32,7 @@ interface MigrationTablesConfig {
     currentTable: number;
     totalTables: number;
     tableName: string;
-    status: 'fetching' | 'creating' | 'migrating' | 'complete' | 'error';
+    status: "fetching" | "creating" | "migrating" | "complete" | "error";
     error?: Error;
   }) => void;
 }
@@ -53,8 +44,9 @@ interface MigrationResult {
 }
 
 export async function migrateTable(config: MigrationConfig): Promise<void> {
-  const { airtableService, gristService, source, destination, mapping } = config;
-  
+  const { airtableService, gristService, source, destination, mapping } =
+    config;
+
   // Fetch all records from Airtable
   const airtableRecords = await airtableService.getAllRecords(
     source.baseId,
@@ -63,7 +55,7 @@ export async function migrateTable(config: MigrationConfig): Promise<void> {
 
   if (airtableRecords.length === 0) return;
 
-  const gristRecords = airtableRecords.map(record => 
+  const gristRecords = airtableRecords.map((record) =>
     airtableToGristRecord(record, mapping)
   );
 
@@ -72,44 +64,18 @@ export async function migrateTable(config: MigrationConfig): Promise<void> {
   for (let i = 0; i < gristRecords.length; i += batchSize) {
     const batch = gristRecords.slice(i, i + batchSize);
     await gristService.addRecordsToTable(
-      destination.documentId, 
-      destination.tableId, 
+      destination.documentId,
+      destination.tableId,
       batch
     );
   }
 }
 
-export function airtableToGristRecord(
-  airtableRecord: AirtableRecord,
-  gristTableMapping: Record<string, string>
-): GristRecord {
-  const gristFields: GristRecord = {};
-
-  for (const field in airtableRecord.fields) {
-    const value = airtableRecord.fields[field];
-
-    let result: string | number | boolean | (string | number | boolean)[] | null;
-    if (typeof value === "string") result = value;
-    else if (typeof value === "number") result = value;
-    else if (typeof value === "boolean") result = value;
-    else if (Array.isArray(value)) {
-      if (value.length === 1) {
-        result = value[0];
-      } else {
-        result = ["L", ...value];
-      }
-    } else result = null;
-
-    if (gristTableMapping[field]) {
-      gristFields[gristTableMapping[field]] = result;
-    }
-  }
-
-  return gristFields;
-}
-
-export async function migrateTables(config: MigrationTablesConfig): Promise<MigrationResult> {
-  const { airtableService, gristService, source, destination, onProgress } = config;
+export async function migrateTables(
+  config: MigrationTablesConfig
+): Promise<MigrationResult> {
+  const { airtableService, gristService, source, destination, onProgress } =
+    config;
   const errors: Error[] = [];
   const tableIds: string[] = [];
 
@@ -118,8 +84,8 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
     onProgress?.({
       currentTable: 0,
       totalTables: source.tableIds.length,
-      tableName: '',
-      status: 'creating'
+      tableName: "",
+      status: "creating"
     });
 
     const documentId = await gristService.createDocument(
@@ -135,8 +101,8 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
     onProgress?.({
       currentTable: 0,
       totalTables: source.tableIds.length,
-      tableName: '',
-      status: 'fetching'
+      tableName: "",
+      status: "fetching"
     });
 
     // Fetch schemas for all selected tables
@@ -157,8 +123,8 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
     onProgress?.({
       currentTable: 0,
       totalTables: source.tableIds.length,
-      tableName: '',
-      status: 'creating'
+      tableName: "",
+      status: "creating"
     });
 
     const createdTableIds = await gristService.addTablesToDocument(
@@ -177,7 +143,7 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
         currentTable: i + 1,
         totalTables: source.tableIds.length,
         tableName,
-        status: 'migrating'
+        status: "migrating"
       });
 
       try {
@@ -201,7 +167,7 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
           currentTable: i + 1,
           totalTables: source.tableIds.length,
           tableName,
-          status: 'error',
+          status: "error",
           error: error instanceof Error ? error : new Error(String(error))
         });
       }
@@ -210,19 +176,20 @@ export async function migrateTables(config: MigrationTablesConfig): Promise<Migr
     onProgress?.({
       currentTable: source.tableIds.length,
       totalTables: source.tableIds.length,
-      tableName: '',
-      status: 'complete'
+      tableName: "",
+      status: "complete"
     });
 
     return { documentId, tableIds, errors };
   } catch (error) {
-    const finalError = error instanceof Error ? error : new Error(String(error));
+    const finalError =
+      error instanceof Error ? error : new Error(String(error));
     errors.push(finalError);
     onProgress?.({
       currentTable: 0,
       totalTables: source.tableIds.length,
-      tableName: '',
-      status: 'error',
+      tableName: "",
+      status: "error",
       error: finalError
     });
     throw finalError;

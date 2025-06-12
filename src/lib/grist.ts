@@ -12,8 +12,8 @@ export enum GristFieldType {
   DATETIME = "DateTime",
   BOOL = "Bool",
   CHOICE = "Choice",
-  CHOICE_LIST = "ChoiceList"
-  // Add more types as needed
+  CHOICE_LIST = "ChoiceList",
+  LINK = "Link" // Add more types as needed
 }
 
 export interface GristField {
@@ -235,97 +235,6 @@ export class GristService {
       throw error;
     }
   }
-}
-
-/**
- * Convert Airtable field type to Grist field type
- */
-export function airtableToGristFieldType(
-  airtableField: any
-): [GristFieldType, any] {
-  const typeMapping: Record<string, GristFieldType> = {
-    singleLineText: GristFieldType.TEXT,
-    multilineText: GristFieldType.TEXT,
-    richText: GristFieldType.TEXT,
-    email: GristFieldType.TEXT,
-    url: GristFieldType.TEXT,
-    phoneNumber: GristFieldType.TEXT,
-    number: GristFieldType.NUMERIC,
-    currency: GristFieldType.NUMERIC,
-    percent: GristFieldType.NUMERIC,
-    date: GristFieldType.DATE,
-    dateTime: GristFieldType.DATETIME,
-    checkbox: GristFieldType.BOOL,
-    singleSelect: GristFieldType.CHOICE,
-    multipleSelects: GristFieldType.CHOICE_LIST,
-    formula: GristFieldType.TEXT, // Will need special handling
-    attachment: GristFieldType.TEXT, // Store as URLs/text
-    autoNumber: GristFieldType.INT,
-    barcode: GristFieldType.TEXT,
-    button: GristFieldType.TEXT,
-    collaborator: GristFieldType.TEXT,
-    count: GristFieldType.INT,
-    createdBy: GristFieldType.TEXT,
-    createdTime: GristFieldType.DATETIME,
-    duration: GristFieldType.NUMERIC,
-    lastModifiedBy: GristFieldType.TEXT,
-    lastModifiedTime: GristFieldType.DATETIME,
-    lookup: GristFieldType.TEXT,
-    rating: GristFieldType.INT,
-    rollup: GristFieldType.TEXT
-  };
-
-  const gristType = typeMapping[airtableField.type] || GristFieldType.TEXT;
-
-  if (gristType == GristFieldType.CHOICE) {
-    return [
-      gristType,
-      { choices: airtableField.options.choices.map((choice) => choice.name) }
-    ];
-  }
-  if (gristType == GristFieldType.CHOICE_LIST) {
-    return [
-      gristType,
-      { choices: airtableField.options.choices.map((choice) => choice.name) }
-    ];
-  }
-
-  return [gristType, null];
-}
-
-/**
- * Convert Airtable table schema to Grist table schema
- */
-export function airtableToGristTable(
-  airtableTable: any
-): [GristTable, Record<string, string>] {
-  const mapping = {};
-  const columns: GristColumn[] = airtableTable.fields.map(
-    (airtableField: any) => {
-      mapping[airtableField.name] = airtableField.id;
-
-      const [gristType, widgetOptions] =
-        airtableToGristFieldType(airtableField);
-
-      return {
-        id: airtableField.id,
-        fields: {
-          label: airtableField.name,
-          type: gristType,
-          widgetOptions:
-            widgetOptions == null ? undefined : JSON.stringify(widgetOptions)
-        }
-      };
-    }
-  );
-
-  return [
-    {
-      id: airtableTable.name,
-      columns
-    },
-    mapping
-  ];
 }
 
 /**

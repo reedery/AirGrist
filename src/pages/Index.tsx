@@ -23,7 +23,7 @@ import {
   CompletionStep,
   MigrationFooter,
 } from "@/components/migration";
-import { migrateTables } from "@/lib/migration";
+import { migrateTables } from "@/lib/migrationProcess";
 
 // Configuration - in a real app, these would come from environment variables
 const GRIST_API_URL = "https://docs.getgrist.com";
