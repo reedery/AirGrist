@@ -3,8 +3,7 @@
  * Handles all communications with the Grist API
  * Translated from grist_main.py
  */
-
-export enum GristFieldType {
+export enum GristFieldTypeEnum {
   TEXT = "Text",
   NUMERIC = "Numeric",
   INT = "Int",
@@ -13,8 +12,10 @@ export enum GristFieldType {
   BOOL = "Bool",
   CHOICE = "Choice",
   CHOICE_LIST = "ChoiceList",
-  LINK = "Link" // Add more types as needed
+  LINK = "Link"
 }
+
+export type GristFieldType = GristFieldTypeEnum | `Ref:${string}`;
 
 export interface GristField {
   label: string;

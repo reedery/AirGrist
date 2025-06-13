@@ -54,7 +54,7 @@ export async function migrateTables(
     // Fetch schemas and prepare tables
     const gristTables = [];
     const gristTableMappings = [];
-    const tableSchemas: Record<string, AirtableTable> = {};
+    //const tableSchemas: Record<string, AirtableTable> = {};
 
     onProgress?.({
       currentTable: 0,
@@ -63,19 +63,34 @@ export async function migrateTables(
       status: "fetching"
     });
 
+    const tablesSchema = (await airtableService.getTablesSchema(
+      source.baseId
+    )) as Record<string, AirtableTable>;
+    // tableSchemas[tableId] = tableSchema;
+
     // Fetch schemas for all selected tables
     for (const tableId of source.tableIds) {
-      const tableSchema = await airtableService.getTableSchema(
-        source.baseId,
+      // Convert Airtable table to Grist format
+      const [gristTable, gristTableMapping] = airtableToGristTable(
+        tablesSchema,
         tableId
       );
-      tableSchemas[tableId] = tableSchema;
-
-      // Convert Airtable table to Grist format
-      const [gristTable, gristTableMapping] = airtableToGristTable(tableSchema);
       gristTables.push(gristTable);
       gristTableMappings.push(gristTableMapping);
     }
+    console.log("Grist Tables:", gristTables);
+    console.log("Grist Table Mappings:", gristTableMappings);
+    console.log("Table Schemas:", tablesSchema);
+    //reverse the gristTables array
+    gristTables.reverse();
+    gristTableMappings.reverse();
+    /*gristTables.forEach((gristTable) => {
+      gristTable.columns.forEach((column) => {
+        if (column.fields.type === GristFieldTypeEnum.LINK) {
+          column.fields.type = `Ref:${column.fields.widgetOptions.refTlinkedTableId}`;
+        }
+      });
+    });*/
 
     // Create tables in Grist
     onProgress?.({
@@ -94,7 +109,7 @@ export async function migrateTables(
     for (let i = 0; i < source.tableIds.length; i++) {
       const airtableTableId = source.tableIds[i];
       const gristTableId = createdTableIds[i];
-      const tableName = tableSchemas[airtableTableId].name;
+      const tableName = tablesSchema[airtableTableId].name;
       const gristTableMapping = gristTableMappings[i];
 
       onProgress?.({

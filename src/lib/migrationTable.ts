@@ -1,6 +1,12 @@
-import { GristFieldType, GristTable, GristColumn } from "./grist";
-import { AirtableService } from "./airtable";
+import {
+  GristFieldTypeEnum,
+  GristTable,
+  GristColumn,
+  GristFieldType
+} from "./grist";
 import { GristService } from "./grist";
+import { AirtableTable, AirtableField, AirtableService } from "./airtable";
+import { capitalizeFirstLetter } from "./utils";
 
 type AirtableFieldValue =
   | string
@@ -24,19 +30,21 @@ interface GristRecord {
     | null;
 }
 
-interface AirtableField {
+/*interface AirtableField {
   id: string;
   name: string;
   type: string;
   options?: {
+    linkedTableId: unknown;
     choices?: Array<{ name: string }>;
   };
-}
+}*/
 
-interface AirtableTable {
+/*nterface AirtableTable {
   name: string;
+  id: string;
   fields: AirtableField[];
-}
+}*/
 interface MigrationConfig {
   airtableService: AirtableService;
   gristService: GristService;
@@ -50,6 +58,11 @@ interface MigrationConfig {
   };
   mapping: Record<string, string>;
 }
+
+/**
+ * Migrate a single Airtable table to Grist
+ * @param config - Migration configuration containing services and identifiers
+ */
 export async function migrateTable(config: MigrationConfig): Promise<void> {
   const { airtableService, gristService, source, destination, mapping } =
     config;
@@ -62,8 +75,9 @@ export async function migrateTable(config: MigrationConfig): Promise<void> {
 
   if (airtableRecords.length === 0) return;
 
-  const gristRecords = airtableRecords.map((record) =>
-    airtableToGristRecord(record, mapping)
+  const gristRecords = airtableRecords.map((record, index) =>
+    // Convert Airtable record to Grist record using the provided mapping
+    airtableToGristRecord(record, mapping, index)
   );
 
   // Add records to Grist in batches
@@ -82,21 +96,56 @@ export async function migrateTable(config: MigrationConfig): Promise<void> {
  * Convert Airtable table schema to Grist table schema
  */
 export function airtableToGristTable(
-  airtableTable: AirtableTable
+  tablesSchema: Record<string, AirtableTable>,
+  tableId: string
 ): [GristTable, Record<string, string>] {
+  console.log(tablesSchema);
+  console.log(tableId);
+  // Validate tableId exists in the schema
+  const airtableTable = tablesSchema[tableId];
+
+  if (!airtableTable) {
+    throw new Error(`Table with ID ${tableId} not found in Airtable schema`);
+  }
+
   const mapping: Record<string, string> = {};
   const columns: GristColumn[] = airtableTable.fields.map(
     (airtableField: AirtableField) => {
       mapping[airtableField.name] = airtableField.id;
 
-      const [gristType, widgetOptions] =
-        airtableToGristFieldType(airtableField);
+      const [gristType, widgetOptions] = airtableToGristFieldType(
+        airtableField,
+        tablesSchema
+      );
+
+      let relation,
+        visibleCol = null;
+      if (
+        gristType === GristFieldTypeEnum.LINK &&
+        airtableField.options &&
+        airtableField.options.linkedTableId
+      ) {
+        relation = ("Ref:" +
+          capitalizeFirstLetter(
+            tablesSchema[airtableField.options.linkedTableId].name
+          )) as GristFieldType;
+        const referencedFieldID = tablesSchema[
+          airtableField.options.linkedTableId
+        ].fields.find((t) => t.id === airtableField.options.inverseLinkFieldId);
+        // find the index of the referenced field in the linked table
+        visibleCol = tablesSchema[
+          airtableField.options.linkedTableId
+        ].fields.findIndex(
+          (t) => t.id === airtableField.options.inverseLinkFieldId
+        );
+      }
 
       return {
         id: airtableField.id,
         fields: {
           label: airtableField.name,
-          type: gristType,
+          type: relation || gristType,
+          visibleCol,
           widgetOptions:
             widgetOptions == null ? undefined : JSON.stringify(widgetOptions)
         }
@@ -117,52 +166,56 @@ export function airtableToGristTable(
  * Convert Airtable field type to Grist field type
  */
 export function airtableToGristFieldType(
-  airtableField: AirtableField
+  airtableField: AirtableField,
+  tablesSchema: Record<string, AirtableTable>
 ): [GristFieldType, Record<string, unknown> | null] {
-  const typeMapping: Record<string, GristFieldType> = {
-    singleLineText: GristFieldType.TEXT,
-    multilineText: GristFieldType.TEXT,
-    richText: GristFieldType.TEXT,
-    email: GristFieldType.TEXT,
-    url: GristFieldType.TEXT,
-    phoneNumber: GristFieldType.TEXT,
-    number: GristFieldType.NUMERIC,
-    currency: GristFieldType.NUMERIC,
-    percent: GristFieldType.NUMERIC,
-    date: GristFieldType.DATE,
-    dateTime: GristFieldType.DATETIME,
-    checkbox: GristFieldType.BOOL,
-    singleSelect: GristFieldType.CHOICE,
-    multipleSelects: GristFieldType.CHOICE_LIST,
-    formula: GristFieldType.TEXT, // Will need special handling
-    attachment: GristFieldType.TEXT, // Store as URLs/text
-    autoNumber: GristFieldType.INT,
-    barcode: GristFieldType.TEXT,
-    button: GristFieldType.TEXT,
-    collaborator: GristFieldType.TEXT,
-    count: GristFieldType.INT,
-    createdBy: GristFieldType.TEXT,
-    createdTime: GristFieldType.DATETIME,
-    duration: GristFieldType.NUMERIC,
-    lastModifiedBy: GristFieldType.TEXT,
-    lastModifiedTime: GristFieldType.DATETIME,
-    lookup: GristFieldType.TEXT,
-    rating: GristFieldType.INT,
-    rollup: GristFieldType.TEXT,
-    multipleRecordLinks: GristFieldType.TEXT,
-    singleRecordLink: GristFieldType.TEXT
+  const typeMapping: Record<string, GristFieldTypeEnum> = {
+    singleLineText: GristFieldTypeEnum.TEXT,
+    multilineText: GristFieldTypeEnum.TEXT,
+    richText: GristFieldTypeEnum.TEXT,
+    email: GristFieldTypeEnum.TEXT,
+    url: GristFieldTypeEnum.TEXT,
+    phoneNumber: GristFieldTypeEnum.TEXT,
+    number: GristFieldTypeEnum.NUMERIC,
+    currency: GristFieldTypeEnum.NUMERIC,
+    percent: GristFieldTypeEnum.NUMERIC,
+    date: GristFieldTypeEnum.DATE,
+    dateTime: GristFieldTypeEnum.DATETIME,
+    checkbox: GristFieldTypeEnum.BOOL,
+    singleSelect: GristFieldTypeEnum.CHOICE,
+    multipleSelects: GristFieldTypeEnum.CHOICE_LIST,
+    formula: GristFieldTypeEnum.TEXT,
+    attachment: GristFieldTypeEnum.TEXT,
+    autoNumber: GristFieldTypeEnum.INT,
+    barcode: GristFieldTypeEnum.TEXT,
+    button: GristFieldTypeEnum.TEXT,
+    collaborator: GristFieldTypeEnum.TEXT,
+    count: GristFieldTypeEnum.INT,
+    createdBy: GristFieldTypeEnum.TEXT,
+    createdTime: GristFieldTypeEnum.DATETIME,
+    duration: GristFieldTypeEnum.NUMERIC,
+    lastModifiedBy: GristFieldTypeEnum.TEXT,
+    lastModifiedTime: GristFieldTypeEnum.DATETIME,
+    lookup: GristFieldTypeEnum.TEXT,
+    rating: GristFieldTypeEnum.INT,
+    rollup: GristFieldTypeEnum.TEXT,
+    multipleRecordLinks: GristFieldTypeEnum.LINK,
+    singleRecordLink: GristFieldTypeEnum.LINK
   };
 
-  const gristType = typeMapping[airtableField.type] || GristFieldType.TEXT;
+  const gristType = typeMapping[airtableField.type] || GristFieldTypeEnum.TEXT;
 
-  if (gristType === GristFieldType.CHOICE && airtableField.options?.choices) {
+  if (
+    gristType === GristFieldTypeEnum.CHOICE &&
+    airtableField.options?.choices
+  ) {
     return [
       gristType,
       { choices: airtableField.options.choices.map((choice) => choice.name) }
     ];
   }
   if (
-    gristType === GristFieldType.CHOICE_LIST &&
+    gristType === GristFieldTypeEnum.CHOICE_LIST &&
     airtableField.options?.choices
   ) {
     return [
@@ -176,7 +229,8 @@ export function airtableToGristFieldType(
 
 export function airtableToGristRecord(
   airtableRecord: AirtableRecord,
-  gristTableMapping: Record<string, string>
+  gristTableMapping: Record<string, string>,
+  index: number
 ): GristRecord {
   const gristFields: GristRecord = {};
 
