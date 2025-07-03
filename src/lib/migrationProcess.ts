@@ -1,7 +1,19 @@
 import { AirtableService } from "./airtable";
 import { GristService } from "./grist";
 import { AirtableTable } from "./airtable";
-import { airtableToGristTable, migrateTable } from "./migrationTable";
+import {
+  airtableToGristTable,
+  migrateTable,
+  airtableToGristRecord
+} from "./migrationTable";
+
+export interface RelationConfig {
+  sourceTableId: string;
+  sourceFieldId: string;
+  targetTableId: string;
+  targetFieldId: string;
+  isActive: boolean;
+}
 
 interface MigrationTablesConfig {
   airtableService: AirtableService;
@@ -14,6 +26,7 @@ interface MigrationTablesConfig {
     workspaceId: number;
     documentName: string;
   };
+  relations?: RelationConfig[];
   onProgress?: (progress: {
     currentTable: number;
     totalTables: number;
@@ -32,10 +45,17 @@ interface MigrationResult {
 export async function migrateTables(
   config: MigrationTablesConfig
 ): Promise<MigrationResult> {
-  const { airtableService, gristService, source, destination, onProgress } =
-    config;
+  const {
+    airtableService,
+    gristService,
+    source,
+    destination,
+    relations = [],
+    onProgress
+  } = config;
   const errors: Error[] = [];
   const tableIds: string[] = [];
+  const recordMappings: Record<string, Record<string, number>> = {};
 
   try {
     // Create a new Grist document
@@ -73,7 +93,8 @@ export async function migrateTables(
       // Convert Airtable table to Grist format
       const [gristTable, gristTableMapping] = airtableToGristTable(
         tablesSchema,
-        tableId
+        tableId,
+        relations
       );
       gristTables.push(gristTable);
       gristTableMappings.push(gristTableMapping);
@@ -83,7 +104,7 @@ export async function migrateTables(
     console.log("Table Schemas:", tablesSchema);
     //reverse the gristTables array
     gristTables.reverse();
-    gristTableMappings.reverse();
+
     /*gristTables.forEach((gristTable) => {
       gristTable.columns.forEach((column) => {
         if (column.fields.type === GristFieldTypeEnum.LINK) {
@@ -104,7 +125,10 @@ export async function migrateTables(
       documentId,
       gristTables
     );
+    console.log("Created Table IDs:", createdTableIds);
 
+    createdTableIds.reverse();
+    //source.tableIds.reverse();
     // Migrate data for each table
     for (let i = 0; i < source.tableIds.length; i++) {
       const airtableTableId = source.tableIds[i];
@@ -112,6 +136,10 @@ export async function migrateTables(
       const tableName = tablesSchema[airtableTableId].name;
       const gristTableMapping = gristTableMappings[i];
 
+      console.log("Airtable Table ID:", airtableTableId);
+      console.log("Grist Table ID:", gristTableId);
+      console.log("Migrating Table:", tableName);
+      console.log("Grist Table Mapping:", gristTableMapping);
       onProgress?.({
         currentTable: i + 1,
         totalTables: source.tableIds.length,
@@ -120,19 +148,34 @@ export async function migrateTables(
       });
 
       try {
-        await migrateTable({
-          airtableService,
-          gristService,
-          source: {
-            baseId: source.baseId,
-            tableId: airtableTableId
-          },
-          destination: {
-            documentId,
-            tableId: gristTableId
-          },
-          mapping: gristTableMapping
+        // Récupérer les enregistrements Airtable
+        const airtableRecords = await airtableService.getAllRecords(
+          source.baseId,
+          airtableTableId
+        );
+
+        // Créer un mapping des IDs Airtable vers les IDs Grist
+        const tableRecordMapping: Record<string, number> = {};
+        const gristRecords = airtableRecords.map((record, index) => {
+          const gristRecord = airtableToGristRecord(
+            record,
+            gristTableMapping,
+            index
+          );
+          // Stocker le mapping pour les relations
+          tableRecordMapping[record.id] = index + 1; // Grist utilise des IDs 1-based
+          return gristRecord;
         });
+
+        // Ajouter les enregistrements à Grist
+        await gristService.addRecordsToTable(
+          documentId,
+          gristTableId,
+          gristRecords
+        );
+
+        // Stocker le mapping pour cette table
+        recordMappings[airtableTableId] = tableRecordMapping;
         tableIds.push(gristTableId);
       } catch (error) {
         errors.push(error instanceof Error ? error : new Error(String(error)));
@@ -140,6 +183,43 @@ export async function migrateTables(
           currentTable: i + 1,
           totalTables: source.tableIds.length,
           tableName,
+          status: "error",
+          error: error instanceof Error ? error : new Error(String(error))
+        });
+      }
+    }
+
+    // Mettre à jour les relations après avoir migré toutes les tables
+    for (const relation of relations) {
+      try {
+        const sourceTableId =
+          createdTableIds[source.tableIds.indexOf(relation.sourceTableId)];
+        const targetTableId =
+          createdTableIds[source.tableIds.indexOf(relation.targetTableId)];
+
+        if (!sourceTableId || !targetTableId) {
+          throw new Error(`Table source ou cible non trouvée pour la relation`);
+        }
+
+        // Mettre à jour la colonne de référence dans Grist
+        await gristService.updateColumnReference(
+          documentId,
+          sourceTableId,
+          relation.sourceFieldId,
+          targetTableId,
+          recordMappings[relation.targetTableId]
+        );
+        // Mettre à jour la colonne de référence inverse si elle existe
+        // avec une formule
+        // "isFormula": true,
+        // "formula": "Users.lookupRecords(fldio7rm6aaE1hCx1=$id).fldXp3uBhCx6cICCm",
+        // "label": "Users_Name",
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+        onProgress?.({
+          currentTable: source.tableIds.length,
+          totalTables: source.tableIds.length,
+          tableName: "Relations",
           status: "error",
           error: error instanceof Error ? error : new Error(String(error))
         });

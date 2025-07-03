@@ -7,7 +7,6 @@ import {
 } from "@/lib/airtable";
 import {
   createGristService,
-  airtableToGristTable,
   validateGristCredentials,
   GristService,
   type GristOrganization,
@@ -24,6 +23,8 @@ import {
   MigrationFooter,
 } from "@/components/migration";
 import { migrateTables } from "@/lib/migrationProcess";
+import { RelationSelectionStep } from "@/components/migration/RelationSelectionStep";
+import type { RelationConfig } from "@/lib/migrationProcess";
 
 // Configuration - in a real app, these would come from environment variables
 const GRIST_API_URL = "https://docs.getgrist.com";
@@ -51,6 +52,7 @@ const Index = () => {
   );
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(false);
+  const [relationConfigs, setRelationConfigs] = useState<RelationConfig[]>([]);
   const { toast } = useToast();
 
   const handleTokenValidation = async () => {
@@ -134,24 +136,37 @@ const Index = () => {
 
     try {
       const airtableService = createAirtableService(airtableToken);
-      const tables = await airtableService.getTables(baseId);
-      setAirtableTables(tables);
+      
+      // Récupérer le schéma complet des tables
+      const tablesSchema = await airtableService.getTablesSchema(baseId) as Record<string, AirtableTable>;
+      
+      // Convertir le schéma en tableau de tables avec leurs champs
+      const tablesWithDetails = Object.entries(tablesSchema).map(([id, table]) => ({
+        id,
+        name: table.name,
+        description: table.description,
+        primaryFieldId: table.primaryFieldId,
+        recordCount: table.recordCount,
+        fields: table.fields
+      }));
+
+      setAirtableTables(tablesWithDetails);
       setIsLoadingTables(false);
       setCurrentStep(3);
 
       toast({
-        title: "Base Selected",
-        description: `Loaded ${tables.length} table(s) from ${
+        title: "Base Sélectionnée",
+        description: `${tablesWithDetails.length} table(s) chargée(s) depuis ${
           airtableBases.find((b) => b.id === baseId)?.name
         }`,
       });
     } catch (error) {
       setIsLoadingTables(false);
+      console.error("Erreur lors du chargement des tables:", error);
 
       toast({
-        title: "Failed to Load Tables",
-        description:
-          "Failed to fetch tables from the selected base. Please try again.",
+        title: "Échec du Chargement des Tables",
+        description: "Impossible de récupérer les tables depuis la base sélectionnée. Veuillez réessayer.",
         variant: "destructive",
       });
     }
@@ -165,16 +180,17 @@ const Index = () => {
     );
   };
 
-  const handleContinueToOrgSelection = async () => {
+  const handleContinueToOrgSelection = async (relations: RelationConfig[]) => {
     if (selectedTables.length === 0) {
       toast({
-        title: "No Tables Selected",
-        description: "Please select at least one table to import",
+        title: "Aucune Table Sélectionnée",
+        description: "Veuillez sélectionner au moins une table à importer",
         variant: "destructive",
       });
       return;
     }
 
+    setRelationConfigs(relations);
     setIsLoadingOrgs(true);
     setCurrentStep(4);
 
@@ -185,15 +201,14 @@ const Index = () => {
       setIsLoadingOrgs(false);
 
       toast({
-        title: "Organizations Loaded",
-        description: `Found ${orgs.length} organization(s) in your Grist account`,
+        title: "Organisations Chargées",
+        description: `${orgs.length} organisation(s) trouvée(s) dans votre compte Grist`,
       });
     } catch (error) {
       setIsLoadingOrgs(false);
       toast({
-        title: "Failed to Load Organizations",
-        description:
-          "Failed to fetch organizations from Grist. Please try again.",
+        title: "Échec du Chargement des Organisations",
+        description: "Impossible de récupérer les organisations depuis Grist. Veuillez réessayer.",
         variant: "destructive",
       });
     }
@@ -257,8 +272,8 @@ const Index = () => {
       const gristService = createGristService(GRIST_API_URL, gristToken);
 
       // Create document name
-      const baseName = airtableBases.find((b) => b.id === selectedBase)?.name || "Unknown Base";
-      const documentName = `Imported from ${baseName} - ${new Date().toLocaleDateString()}`;
+      const baseName = airtableBases.find((b) => b.id === selectedBase)?.name || "Base Inconnue";
+      const documentName = `Importé depuis ${baseName} - ${new Date().toLocaleDateString()}`;
 
       const result = await migrateTables({
         airtableService,
@@ -271,6 +286,7 @@ const Index = () => {
           workspaceId: selectedWorkspace,
           documentName
         },
+        relations: relationConfigs,
         onProgress: (progress) => {
           switch (progress.status) {
             case 'creating':
@@ -314,11 +330,20 @@ const Index = () => {
 
     } catch (error) {
       setIsImporting(false);
-      console.error("Migration failed:", error);
+      console.error("Échec de la migration:", error);
+
+      let errorMessage = "Une erreur s'est produite pendant la migration. Veuillez réessayer.";
+      if (error instanceof Error) {
+        if (error.message.includes("500")) {
+          errorMessage = "Erreur serveur Grist (500). Veuillez vérifier vos permissions et réessayer.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
 
       toast({
-        title: "Migration Failed",
-        description: error instanceof Error ? error.message : "An error occurred during migration. Please try again.",
+        title: "Échec de la Migration",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -352,6 +377,7 @@ const Index = () => {
     setIsLoadingOrgs(false);
     setIsLoadingWorkspaces(false);
     setCreatedDocumentId("");
+    setRelationConfigs([]);
   };
 
   return (
@@ -393,8 +419,17 @@ const Index = () => {
               isImporting={false}
               gristUrl={gristUrl}
               onTableToggle={handleTableToggle}
-              onStartMigration={handleContinueToOrgSelection}
+              onStartMigration={() => setCurrentStep(3.5)}
               onGoBack={() => setCurrentStep(2)}
+            />
+          )}
+
+          {currentStep === 3.5 && (
+            <RelationSelectionStep
+              tables={airtableTables}
+              selectedTables={selectedTables}
+              onContinue={handleContinueToOrgSelection}
+              onGoBack={() => setCurrentStep(3)}
             />
           )}
 
@@ -408,7 +443,7 @@ const Index = () => {
               isLoadingWorkspaces={isLoadingWorkspaces}
               onOrgSelect={handleOrgSelection}
               onWorkspaceSelect={handleWorkspaceSelection}
-              onGoBack={() => setCurrentStep(3)}
+              onGoBack={() => setCurrentStep(3.5)}
               onContinue={handleStartMigration}
             />
           )}

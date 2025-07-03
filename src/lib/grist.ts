@@ -236,6 +236,65 @@ export class GristService {
       throw error;
     }
   }
+
+  /**
+   * Met à jour une colonne de référence dans Grist
+   */
+  async updateColumnReference(
+    documentId: string,
+    sourceTableId: string,
+    sourceFieldId: string,
+    targetTableId: string,
+    recordMapping: Record<string, number>
+  ): Promise<void> {
+    try {
+      // 1. Récupérer les enregistrements de la table source
+      const url = `${this.baseUrl}/api/docs/${documentId}/tables/${sourceTableId}/records`;
+      const response = await fetch(url, {
+        method: "GET",
+        headers: this.getHeaders()
+      });
+
+      const data = await this.handleResponse(response);
+      const records = data.records || [];
+
+      // 2. Mettre à jour les références
+      const updates = records.map((record: any) => {
+        const oldValue = record.fields[sourceFieldId];
+        let newValue = null;
+
+        if (Array.isArray(oldValue)) {
+          // Pour les relations multiples
+          newValue = oldValue
+            .map((id: string) => recordMapping[id])
+            .filter((id: number) => id !== undefined);
+        } else if (oldValue) {
+          // Pour les relations simples
+          newValue = recordMapping[oldValue];
+        }
+
+        return {
+          id: record.id,
+          fields: {
+            [sourceFieldId]: newValue
+          }
+        };
+      });
+
+      // 3. Appliquer les mises à jour
+      const updateUrl = `${this.baseUrl}/api/docs/${documentId}/tables/${sourceTableId}/records`;
+      const updateResponse = await fetch(updateUrl, {
+        method: "PATCH",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ records: updates })
+      });
+
+      await this.handleResponse(updateResponse);
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des références:", error);
+      throw error;
+    }
+  }
 }
 
 /**

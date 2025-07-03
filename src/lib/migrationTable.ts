@@ -7,6 +7,7 @@ import {
 import { GristService } from "./grist";
 import { AirtableTable, AirtableField, AirtableService } from "./airtable";
 import { capitalizeFirstLetter } from "./utils";
+import { RelationConfig } from "./migrationProcess";
 
 type AirtableFieldValue =
   | string
@@ -97,10 +98,9 @@ export async function migrateTable(config: MigrationConfig): Promise<void> {
  */
 export function airtableToGristTable(
   tablesSchema: Record<string, AirtableTable>,
-  tableId: string
+  tableId: string,
+  relations: RelationConfig[] = []
 ): [GristTable, Record<string, string>] {
-  console.log(tablesSchema);
-  console.log(tableId);
   // Validate tableId exists in the schema
   const airtableTable = tablesSchema[tableId];
 
@@ -113,30 +113,48 @@ export function airtableToGristTable(
     (airtableField: AirtableField) => {
       mapping[airtableField.name] = airtableField.id;
 
-      const [gristType, widgetOptions] = airtableToGristFieldType(
-        airtableField,
-        tablesSchema
+      // Vérifier si ce champ fait partie d'une relation active
+      const activeRelation = relations.find(
+        (r) =>
+          r.isActive &&
+          ((r.sourceTableId === tableId &&
+            r.sourceFieldId === airtableField.id) ||
+            (r.targetTableId === tableId &&
+              r.targetFieldId === airtableField.id))
       );
 
-      let relation,
-        visibleCol = null;
-      if (
-        gristType === GristFieldTypeEnum.LINK &&
-        airtableField.options &&
-        airtableField.options.linkedTableId
-      ) {
-        relation = ("Ref:" +
-          capitalizeFirstLetter(
-            tablesSchema[airtableField.options.linkedTableId].name
-          )) as GristFieldType;
-        const referencedFieldID = tablesSchema[
-          airtableField.options.linkedTableId
-        ].fields.find((t) => t.id === airtableField.options.inverseLinkFieldId);
-        // find the index of the referenced field in the linked table
-        visibleCol = tablesSchema[
-          airtableField.options.linkedTableId
-        ].fields.findIndex(
-          (t) => t.id === airtableField.options.inverseLinkFieldId
+      let gristType: GristFieldType;
+      let widgetOptions = null;
+
+      if (activeRelation) {
+        // Si c'est une relation active, on vérifie si on est du côté source
+        const isSource =
+          activeRelation.sourceTableId === tableId &&
+          activeRelation.sourceFieldId === airtableField.id;
+
+        if (isSource) {
+          // On crée la référence uniquement du côté source
+          const targetTable = tablesSchema[activeRelation.targetTableId];
+          if (targetTable) {
+            gristType = `Ref:${capitalizeFirstLetter(
+              targetTable.name
+            )}` as GristFieldType;
+          } else {
+            // Fallback si la table cible n'est pas trouvée
+            [gristType, widgetOptions] = airtableToGristFieldType(
+              airtableField,
+              tablesSchema
+            );
+          }
+        } else {
+          // Du côté cible, on convertit en texte
+          gristType = GristFieldTypeEnum.TEXT;
+        }
+      } else {
+        // Si ce n'est pas une relation active, on utilise la conversion standard
+        [gristType, widgetOptions] = airtableToGristFieldType(
+          airtableField,
+          tablesSchema
         );
       }
 
@@ -144,8 +162,7 @@ export function airtableToGristTable(
         id: airtableField.id,
         fields: {
           label: airtableField.name,
-          type: relation || gristType,
-          visibleCol,
+          type: gristType,
           widgetOptions:
             widgetOptions == null ? undefined : JSON.stringify(widgetOptions)
         }
@@ -153,6 +170,13 @@ export function airtableToGristTable(
     }
   );
 
+  // Return the Grist table schema and the mapping
+  console.log("Mapping", mapping);
+  console.log("Columns", columns);
+  console.log("AirtableTable", airtableTable);
+  console.log("TablesSchema", tablesSchema);
+  console.log("Relations", relations);
+  console.log("GristTable", { id: airtableTable.name, columns });
   return [
     {
       id: airtableTable.name,
