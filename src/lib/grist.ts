@@ -84,6 +84,8 @@ export class GristService {
   private async handleResponse(response: Response): Promise<any> {
     if (!response.ok) {
       const errorMessage = `Grist API error: ${response.status} ${response.statusText}`;
+      console.error("Grist API error:", errorMessage);
+      console.error("Response body:", await response.text());
       throw new GristApiError(
         response.status,
         response.statusText,
@@ -250,6 +252,7 @@ export class GristService {
     try {
       // 1. Récupérer les enregistrements de la table source
       const url = `${this.baseUrl}/api/docs/${documentId}/tables/${sourceTableId}/records`;
+
       const response = await fetch(url, {
         method: "GET",
         headers: this.getHeaders()
@@ -283,6 +286,7 @@ export class GristService {
 
       // 3. Appliquer les mises à jour
       const updateUrl = `${this.baseUrl}/api/docs/${documentId}/tables/${sourceTableId}/records`;
+      console.log("Fetching records from Grist:", updateUrl);
       const updateResponse = await fetch(updateUrl, {
         method: "PATCH",
         headers: this.getHeaders(),
@@ -294,6 +298,70 @@ export class GristService {
       console.error("Erreur lors de la mise à jour des références:", error);
       throw error;
     }
+  }
+
+  /**
+   * Met à jour une colonne pour en faire une colonne calculée (formule) dans Grist (PUT sur toutes les colonnes)
+   */
+  async updateColumnFormula(
+    documentId: string,
+    tableId: string,
+    columnId: string,
+    fields: { isFormula: boolean; formula: string; label?: string }
+  ): Promise<void> {
+    console.log(">>> Entrée dans updateColumnFormula", {
+      documentId,
+      tableId,
+      columnId,
+      fields
+    });
+    // 1. Récupérer toutes les colonnes de la table
+    const urlGet = `${this.baseUrl}/api/docs/${documentId}/tables/${tableId}/columns`;
+    const responseGet = await fetch(urlGet, {
+      method: "GET",
+      headers: this.getHeaders()
+    });
+    const columnsResponse = await this.handleResponse(responseGet);
+    const columns = columnsResponse.columns;
+    console.log("urlGet", urlGet);
+    console.log("responseGet", responseGet);
+    console.log("columns", columns);
+
+    // 2. Modifier la colonne cible
+    const updatedColumns = columns.map((col: any) => {
+      // Clone fields sans colRef
+      const { colRef, ...fieldsWithoutColRef } = col.fields;
+      if (col.id === columnId) {
+        return {
+          ...col,
+          fields: {
+            ...fieldsWithoutColRef,
+            isFormula: fields.isFormula,
+            formula: fields.formula,
+            type: "Any",
+            ...(fields.label ? { label: fields.label } : {})
+          }
+        };
+      }
+      return {
+        ...col,
+        fields: {
+          ...fieldsWithoutColRef
+        }
+      };
+    });
+
+    // 3. Envoyer la liste complète en PUT
+    const urlPut = `${this.baseUrl}/api/docs/${documentId}/tables/${tableId}/columns`;
+    const responsePut = await fetch(urlPut, {
+      method: "PUT",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ columns: updatedColumns })
+    });
+    console.log("urlPut", urlPut);
+    console.log("responsePut", responsePut);
+    console.log("updatedColumns", updatedColumns);
+    await this.handleResponse(responsePut);
   }
 }
 

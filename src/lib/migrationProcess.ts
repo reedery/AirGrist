@@ -201,7 +201,7 @@ export async function migrateTables(
           throw new Error(`Table source ou cible non trouvée pour la relation`);
         }
 
-        // Mettre à jour la colonne de référence dans Grist
+        // Mettre à jour la colonne de référence dans Grist (côté source)
         await gristService.updateColumnReference(
           documentId,
           sourceTableId,
@@ -209,11 +209,37 @@ export async function migrateTables(
           targetTableId,
           recordMappings[relation.targetTableId]
         );
-        // Mettre à jour la colonne de référence inverse si elle existe
-        // avec une formule
-        // "isFormula": true,
-        // "formula": "Users.lookupRecords(fldio7rm6aaE1hCx1=$id).fldXp3uBhCx6cICCm",
-        // "label": "Users_Name",
+
+        // Mettre à jour la colonne de référence inverse si elle existe (côté cible)
+        const targetTable = tablesSchema[relation.targetTableId];
+        const sourceTable = tablesSchema[relation.sourceTableId];
+        const targetField = targetTable?.fields?.find(
+          (f) => f.id === relation.targetFieldId
+        );
+        if (targetField) {
+          // On prend le champ principal de la table source pour l'affichage
+          const sourcePrimaryFieldId = sourceTable.primaryFieldId;
+          // Construction de la formule
+          const formula = `${sourceTableId}.lookupRecords(${relation.sourceFieldId}=$id).${sourcePrimaryFieldId}`;
+          console.log("Appel updateColumnFormula", {
+            documentId,
+            targetTableId,
+            relation,
+            targetField,
+            formula
+          });
+          // PUT sur la colonne cible
+          await gristService.updateColumnFormula(
+            documentId,
+            targetTableId,
+            relation.targetFieldId,
+            {
+              isFormula: true,
+              formula,
+              label: `${sourceTable.name}_Name`
+            }
+          );
+        }
       } catch (error) {
         errors.push(error instanceof Error ? error : new Error(String(error)));
         onProgress?.({
